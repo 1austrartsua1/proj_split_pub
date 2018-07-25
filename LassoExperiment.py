@@ -19,15 +19,15 @@ class OutObj:
 class MethodParams:
     def __init__(self,algo):
         if(algo=='PSF'):
-            self.params ={'doForward':True}
+            self.params ={'doForward':True,'D':0}
         elif(algo=='PSB'):
-            self.params = {}
+            self.params = {'D':0}
         elif(algo=='Fista'):
-            self.params = {'doBT':True,'maxIter':1000,'intialStep':1e0}
+            self.params = {'doBT':True,'maxIter':200,'intialStep':1e0}
         elif(algo=='PG'):
-            self.params = {'maxIter': 1000}
+            self.params = {'maxIter': 200}
         elif(algo=='ADMM'):
-            self.params = {'maxIter': 1000,'c':1.0,'sigma':0.9,'maxInner':20}
+            self.params = {'maxIter': 100,'c':1.0,'sigma':0.9,'maxInner':20,'doP':False,'doTheta':True}
 
     def updateParams(self,newParams):
         self.params.update(newParams)
@@ -49,7 +49,6 @@ class LassoFullExp:
         self.options =\
         {
         'lam':1.0,
-        'relEps':1e-5,
         'opSelectMethod': 'Greedy',
         'partition_type': 'random',
         'doPlot':True,
@@ -57,9 +56,11 @@ class LassoFullExp:
         'normalize':True,
         'funcVals':True,
         'saveForName':'PSFOR(10,G)',
+        'saveBackName':'PSBACK(10,G)',
         'rawIter':False,
         'rawFuncPlt':False,
-        'subgVals':True
+        'subgVals':True,
+        'plotSetLims':False
         }
         self.pSFparams = MethodParams('PSF')
         self.pSBparams = MethodParams('PSB')
@@ -87,7 +88,7 @@ class LassoFullExp:
 
     def updateOptions(self,newOptions):
         self.options.update(newOptions)
-        return 0
+
 
     def updateWhich2run(self,newRuns):
         self.which2run.update(newRuns)
@@ -145,6 +146,19 @@ class LassoFullExp:
 
         [partition_listNew, _] = createPartitions(self.options['n_rows'], self.options['n_partitions'],
                                                      self.options['partition_type'])
+
+        if(self.options['opSelectMethod']=='Greedy'):
+
+            self.updateParams('PSF', {'name':'PS'+'F'+'('+str(self.options['n_partitions'])+',G)'})
+            self.updateParams('PSB', {
+                'name': 'PS' + 'B' + '(' + str(self.options['n_partitions']) + ',G)'})
+
+        else:
+            self.updateParams('PSF', {'name': 'PS' + 'F' + '(' + str(self.options['n_partitions']) + ',' + str(
+                self.pSFparams.params['D']) + ')'})
+            self.updateParams('PSB', {
+                'name': 'PS' + 'B' + '(' + str(self.options['n_partitions']) + ',' + str(
+                    self.pSBparams.params['D']) + ')'})
 
         self.getData(self.A0,self.b0,partition_listNew)
         if(self.options['normalize']):
@@ -288,10 +302,10 @@ class LassoFullExp:
         if (self.options['doPlot']):
             self.legendList = []
             if (self.which2run['doFor']):
-                self.doAplot(self.PSFor,  False, self.options['saveForName'])
+                self.doAplot(self.PSFor,  False, self.pSFparams.params['name'])
 
             if (self.which2run['doBack']):
-                self.doAplot(self.PSBack, False, self.options['saveBackName'])
+                self.doAplot(self.PSBack, False, self.pSBparams.params['name'])
 
             if (self.which2run['doFISTA']):
                 self.doAplot(self.outFista, False, 'FISTA')
@@ -305,49 +319,16 @@ class LassoFullExp:
                 if (self.aDMMparams.params['doP']):
                     self.doAplot(self.outADMMrelp, False, 'RE-ADMMp')
 
-            if (self.options['xtraplots'] > 0):
-                if (len(self.maxMult) == 0):
-                    # no sims run, just doing plotting
-                    maxMults = self.options['maxMults4plots']
-                else:
-                    maxMults = max(self.maxMult)
-                for i in range(self.options['xtraplots']):
-
-                    plotyF = self.xtraplotsF[i]
-                    plotySG = self.xtraplotsSG[i]
-                    if(self.options['rawIter']):
-                        plotx = self.xtraplotsIter[i]
-                    else:
-                        plotx = self.xtraplotsM[i]
-
-                    if(self.options['rawIter']):
-                        Jmax = len(plotx)
-                    else:
-                        Jmax = len(plotx)
-                        for j in range(len(plotx)):
-                            if (plotx[j] > maxMults):
-                                Jmax = j
-                                break
-
-                    plotname = self.xtraplotName[i]
-                    self.legendList.append(plotname)
-                    if(self.options['funcVals']):
-                        if (self.options['rawFuncPlt'] == False):
-                            self.FigFunc.plot(plotx[0:Jmax], [(plotyF[j] - self.opt) / self.opt for j in range(Jmax)])
-                        else:
-                            self.FigFunc.plot(plotx[0:Jmax], plotyF[0:Jmax])
-                    if(self.options['subgVals']):
-                        self.FigSG.plot(plotx[0:Jmax], plotySG[0:Jmax])
-
             self.FigFunc.legend(self.legendList)
             self.FigSG.legend(self.legendList)
             self.FigSG.set_yscale('log')
-            #self.FigFunc.set_ylim([1e-4,1e1])
+
             if(self.options['plotSetLims']):
                 self.FigFunc.set_xlim(self.options['xlim'])
-            #self.FigSG.set_ylim(self.options['ylimSG'])
+                self.FigFunc.set_ylim(self.options['ylim'])
+                self.FigSG.set_ylim(self.options['ylimSG'])
                 self.FigSG.set_xlim(self.options['xlim'])
-            figFunc.suptitle(self.options['plotTitle'])
+
             if(self.options['rawIter']):
                 self.FigFunc.set_xlabel('Iteration count')
                 self.FigSG.set_xlabel('Iteration count')
@@ -357,19 +338,11 @@ class LassoFullExp:
 
             self.FigFunc.set_ylabel('relative error function values')
             self.FigSG.set_ylabel('minimum norm of subgradient')
-            figSG.suptitle(self.options['plotTitle'])
+
             if (self.options['rawFuncPlt'] == False):
                 self.FigFunc.set_yscale('log')
 
-            if(self.options['savePlots']):
-                figFunc.savefig(
-                    self.options['plotSaveFolder'] + self.options['dataSet'] + 'func' + self.options['pltTag'])
-                figSG.savefig(
-                    self.options['plotSaveFolder'] + self.options['dataSet'] + 'SG' + self.options['pltTag'])
-                figFunc.savefig(self.options['plotSaveFolder'] + self.options['dataSet']+'func'+self.options['pltTag']+'.pdf',format='pdf')
-                figSG.savefig(self.options['plotSaveFolder'] + self.options['dataSet']+'SG'+self.options['pltTag']+'.pdf',format='pdf')
-            if(self.options['showPlt']):
-                plt.show()
+            plt.show()
 
 
 

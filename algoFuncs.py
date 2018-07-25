@@ -60,16 +60,12 @@ def generateDelay(D,k,lastCall_i):
 
 
 
-def doProjectionV2(x,y,n_parts,z,w,gamma = 1.0,reducedW = False,beta = 1.0):
+def doProjection(x,y,n_parts,z,w,gamma = 1.0,reducedW = False,beta = 1.0):
     # projection steps on lines 13 through 27
-    #ta = time.time()
-    v = np.sum(y,0)
-    #Ones = np.ones(n_parts)
-    #v = y.T.dot(Ones)
-    #tb =time.time()
-    #t0 = tb-ta
 
-    #print't0 is '+str(t0)
+    v = np.sum(y,0)
+
+
 	# reducedW controls whether we use the hyplerplane as defined in the paper
 	# or as defined in Eckstein (2017): "A Simplified Form of Block-Iterative Operator Splitting, 
 	# and an Asynchronous Algorithm Resembling the Multi-Block ADMM"
@@ -81,35 +77,18 @@ def doProjectionV2(x,y,n_parts,z,w,gamma = 1.0,reducedW = False,beta = 1.0):
     else:
         xbar = x[n_parts-1]
 
-    #ta = time.time()
-    #t1 = ta -  tb
-    #print't1 is ' + str(t1)
+
 
     u = x -  xbar
-    #u = np.subtract(x,xbar)
 
-    #tb = time.time()
-    #t2 = tb-ta
-    #print't2 is ' + str(t2)
     
     pi = np.linalg.norm(u) ** 2 + gamma**(-1)*np.linalg.norm(v) ** 2
-    #ta = time.time()
-    #t3 = ta-tb
-    #print't3 is ' + str(t3)
+
     
     if (pi > 0):
         term1 = z.dot(v)
-        #tb = time.time()
-        #t4 = tb-ta
-        #print't4 is ' + str(t4)
+
         term2 = sum([x[i].dot(w[i]-y[i]) for i in range(n_parts)])
-        #ta = time.time()
-        #t5 = ta-tb
-        #print't5 is ' + str(t5)
-        #term2 = sum([w[i].dot(u[i]) for i in range(n_parts-1)])- sum([x[i].dot(y[i]) for i in range(n_parts)])
-        #term2 = sum(sum(x*(w-y)))
-        #tmp = x*(w-y)
-        #term2 = tmp.sum()
 
         hplane = term1 + term2
     
@@ -120,20 +99,14 @@ def doProjectionV2(x,y,n_parts,z,w,gamma = 1.0,reducedW = False,beta = 1.0):
 
     znew = z - gamma**(-1)*beta * alpha * v
 
-    #tb = time.time()
-    #t6 = tb-ta
-    #print't6 is ' + str(t6)
+
     wnew = np.subtract(w,beta * alpha * u)
-    #wnew = w- beta * alpha * u
-    #ta = time.time()
-    #t7 = ta-tb
-    #print't7 is ' + str(t7)
 
     if(reducedW):
         wnew[n_parts-1]=-sum(wnew[0:(n_parts-1)])
 
 
-    return [znew,wnew,pi,alpha]
+    return [znew,wnew]
 
 
 
