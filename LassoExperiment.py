@@ -1,15 +1,41 @@
+# Copyright 2018, Patrick R. Johnstone
+#    This toolbox is distributed in the hope that it will be useful, but
+#    WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+#    General Public License <http://www.gnu.org/licenses/> for more
+#    details.
+
+## paper reference
+# Projective Splitting with Forward Steps: Asynchronous and Block Iterative Operator Splitting
+# Patrick R. Johnstone and Jonathan Eckstein, arXiv:1803.07043, March 2018
+#
+
+# Throughout we use dictionaries for the options of each method and the overall experiment
+# these are a very convenient python data structure. You can update the dictionary using .update(newDict)
+# if unfamiliar with python dictionaries, one should read about them online before attempting to use this code
+
+# see testRun.py for examples and an explanation of how to use the code
+
 import numpy as np
 
 import runPS as ps
 import L1LS as LSmod
-import algoFuncs as af
 import cvxpy as cvx
+#If you don't have cvxpy and don't want to download, comment this out. Also set 'doCVX' field in the
+#which2run dictionary to False
+
 import proxes as px
 
 import time
 from matplotlib import pyplot as plt
 
 class OutObj:
+    # this is an object to contain the outputs of an algorithm
+    #1. the function values at each iteration
+    #2. the number of  Q-equivalent matrix multiplies per iteration
+    #3. clock runtime
+    #4. the subgradient values per iteration
+
     def __init__(self,f,mults,runtime,subgs):
         self.fout = f
         self.mults = mults
@@ -17,6 +43,8 @@ class OutObj:
         self.sgout = subgs
 
 class MethodParams:
+    #parameters for each algorithm
+    #stored as a dictionary
     def __init__(self,algo):
         if(algo=='PSF'):
             self.params ={'doForward':True,'D':0}
@@ -24,43 +52,50 @@ class MethodParams:
             self.params = {'D':0}
         elif(algo=='Fista'):
             self.params = {'doBT':True,'maxIter':200,'intialStep':1e0}
+            #doBT means to do backtracking
         elif(algo=='PG'):
             self.params = {'maxIter': 200}
         elif(algo=='ADMM'):
             self.params = {'maxIter': 100,'c':1.0,'sigma':0.9,'maxInner':20,'doP':False,'doTheta':True}
 
+
     def updateParams(self,newParams):
         self.params.update(newParams)
+        #update the parameters of a given method.
+
 
 
 class LassoFullExp:
-
+    #this class defines an instance of the lasso experiment from the paper
+    #in addition to running projective splitting we also implement proximal gradient, FISTA, and ADMM with
+    # the relative error criterion (Eckstein: 2016).
+    # We also use the CVXPY solver. If you don't have CVXPY, comment out
     def __init__(self):
         #default values for options
+        # which algorithms to run
+        # default is PSFor and CVX
         self.which2run =\
         {
-            'doCVX': True,
-            'doFor': True,
-            'doBack': False,
+            'doCVX': True, # set to false if you don't have the CVXPY module
+            'doFor': True, # Projective Splitting with forward steps
+            'doBack': False, # Projective Splitting with backward steps
             'doFISTA': False,
             'doPG': False,
             'doADMM': False
         }
+        # these are the default values for the options. Update them using "updateOptions" member function.
         self.options =\
         {
         'lam':1.0,
-        'opSelectMethod': 'Greedy',
-        'partition_type': 'random',
-        'doPlot':True,
+        'opSelectMethod': 'Greedy', # greedy block selection. Can also set to: 'Random'.
+        'partition_type': 'random', # can also set to 'Uniform'.
         'n_partitions':10,
-        'normalize':True,
-        'funcVals':True,
-        'saveForName':'PSFOR(10,G)',
-        'saveBackName':'PSBACK(10,G)',
-        'rawIter':False,
-        'rawFuncPlt':False,
-        'subgVals':True,
-        'plotSetLims':False
+        'normalize':True, #normalize the columns of the data matrix to have unit norm
+        'funcVals':True, #plot function values
+        'rawIter':False, #If true use actual iterations for the x-axis of the plot. Otherwise use Q-equivalent multiplies
+        'rawFuncPlt':False, # If False, plot the function values on a logarithmic scale
+        'subgVals':True, # If true, plot the subgradient values
+        'plotSetLims':False # If true, set limits on the x-axis and y-axis for the plots
         }
         self.pSFparams = MethodParams('PSF')
         self.pSBparams = MethodParams('PSB')
@@ -69,6 +104,7 @@ class LassoFullExp:
         self.aDMMparams = MethodParams('ADMM')
 
     def updateParams(self, method, newParams):
+        #wrapper function to modify method's parameters
         if(method=='PSF'):
             self.pSFparams.updateParams(newParams)
         elif(method=='PSB'):
@@ -82,6 +118,7 @@ class LassoFullExp:
 
 
     def getData(self,A,b,partition_list):
+        # Unlike the paper, we use A for the data matrix rather than Q
         self.A = A
         self.b = b
         self.partition_list = partition_list
@@ -94,8 +131,10 @@ class LassoFullExp:
         self.which2run.update(newRuns)
 
     def runWoptions(self,method):
+        # run a specific method with the options given in the options dictionarys
         if((method=='PSF')|(method=='PSB')):
             newOptions = self.options.copy()
+            # this object prepares to run projective splitting
             outObj = ps.PSLasso()
             outObj.getData(self.A, self.b, self.options['lam'], self.partition_list)
             if(method=='PSF'):
@@ -105,6 +144,7 @@ class LassoFullExp:
             outObj.updateOptions(newOptions)
             print"running "+method
 
+            # run projective splitting
             outObj.runPS()
 
 
@@ -127,7 +167,7 @@ class LassoFullExp:
             print"running ADMM"
             tadmm = time.time()
             [ftheta, fp, theta, p, ADMM_mults,theta_subg,p_subg,tadmmTermC] = \
-            ADMMRelErr_eNet(self.A, self.b, self.options['lam'], 0.0,
+            ADMMRelErr_eNet(self.A, self.b, self.options['lam'],
                                self.aDMMparams.params['maxIter'], self.aDMMparams.params['c'],
                                self.aDMMparams.params['maxInner'],self.aDMMparams.params['sigma'],
                                self.options['subgVals'],self.aDMMparams.params['doP'],
@@ -143,12 +183,14 @@ class LassoFullExp:
         return outObj
 
     def runTheExp(self):
+        # This function actually runs the full lasso experiment with all the options and plots the results
 
+        #first create the partition to be used by projective splitting
         [partition_listNew, _] = createPartitions(self.options['n_rows'], self.options['n_partitions'],
                                                      self.options['partition_type'])
 
         if(self.options['opSelectMethod']=='Greedy'):
-
+            # determine the name for projective splitting in the legend of the plot
             self.updateParams('PSF', {'name':'PS'+'F'+'('+str(self.options['n_partitions'])+',G)'})
             self.updateParams('PSB', {
                 'name': 'PS' + 'B' + '(' + str(self.options['n_partitions']) + ',G)'})
@@ -206,6 +248,7 @@ class LassoFullExp:
 
 
     def getopt(self):
+        # get the optimal function value which is estimated as the smallest value encountered by any of the methods
         listoMins = []
         if(self.which2run['doCVX']):
             listoMins.append(self.cvxopt)
@@ -246,6 +289,7 @@ class LassoFullExp:
 
 
     def getMatvec(self,Ain,b_in):
+        #this is how you read the data matrix and vector in
         self.A0 = Ain
         self.b0 = b_in
         [n_rows,_] = Ain.shape
@@ -259,105 +303,101 @@ class LassoFullExp:
                 self.A.T[i] = self.A.T[i]/(np.linalg.norm(self.A.T[i]))
 
 
-    def doAplot(self,obj,erg,name):
+    def doAplot(self,obj,name):
+        #do a plot for a single algorithm
+
         if(self.options['rawIter']):
             plotx = obj.iters
         else:
             plotx = obj.mults
 
-        if(erg):
-            self.legendList.append(name + ' erg')
-        else:
-            self.legendList.append(name)
+
+        self.legendList.append(name)
         self.maxMult.append(max(plotx))
         if (self.options['funcVals']):
-            if (erg):
-                ploty = obj.ferg
+
+            ploty = obj.fout
+            if(self.options['rawFuncPlt']):
+                self.FigFunc.plot(plotx,ploty)
             else:
-                ploty = obj.fout
-                if(self.options['rawFuncPlt']):
-                    self.FigFunc.plot(plotx,ploty)
-                else:
-                    plotx = np.array(plotx)
-                    ploty = np.array(ploty)
-                    self.FigFunc.plot(plotx, (ploty - self.opt)/self.opt)
+                plotx = np.array(plotx)
+                ploty = np.array(ploty)
+                self.FigFunc.plot(plotx, (ploty - self.opt)/self.opt)
 
 
 
         if (self.options['subgVals']):
-            if(erg):
-                ploty = obj.sgerg
-            else:
-                ploty = obj.sgout
+            ploty = obj.sgout
             self.FigSG.plot([plotx[i] for i in range(len(plotx))], [ploty[i] for i in range(len(ploty))])
 
 
     def metaPlot(self):
+        # plot all algorithms
         figFunc = plt.figure()
         figSG = plt.figure()
         self.FigFunc = figFunc.add_subplot(111)
         self.FigSG = figSG.add_subplot(111)
 
         self.maxMult = []
-        if (self.options['doPlot']):
-            self.legendList = []
-            if (self.which2run['doFor']):
-                self.doAplot(self.PSFor,  False, self.pSFparams.params['name'])
+        self.legendList = []
+        if (self.which2run['doFor']):
+            self.doAplot(self.PSFor, self.pSFparams.params['name'])
 
-            if (self.which2run['doBack']):
-                self.doAplot(self.PSBack, False, self.pSBparams.params['name'])
+        if (self.which2run['doBack']):
+            self.doAplot(self.PSBack, self.pSBparams.params['name'])
 
-            if (self.which2run['doFISTA']):
-                self.doAplot(self.outFista, False, 'FISTA')
+        if (self.which2run['doFISTA']):
+            self.doAplot(self.outFista, 'FISTA')
 
-            if (self.which2run['doPG']):
-                self.doAplot(self.outPG, False, 'PG')
+        if (self.which2run['doPG']):
+            self.doAplot(self.outPG, 'PG')
 
-            if (self.which2run['doADMM']):
-                if (self.aDMMparams.params['doTheta']):
-                    self.doAplot(self.outADMMrelThta, False, 'RE-ADMM')
-                if (self.aDMMparams.params['doP']):
-                    self.doAplot(self.outADMMrelp, False, 'RE-ADMMp')
+        if (self.which2run['doADMM']):
+            if (self.aDMMparams.params['doTheta']):
+                self.doAplot(self.outADMMrelThta, 'RE-ADMM')
+            if (self.aDMMparams.params['doP']):
+                self.doAplot(self.outADMMrelp, 'RE-ADMMp')
 
-            self.FigFunc.legend(self.legendList)
-            self.FigSG.legend(self.legendList)
-            self.FigSG.set_yscale('log')
+        self.FigFunc.legend(self.legendList)
+        self.FigSG.legend(self.legendList)
+        self.FigSG.set_yscale('log')
 
-            if(self.options['plotSetLims']):
-                self.FigFunc.set_xlim(self.options['xlim'])
-                self.FigFunc.set_ylim(self.options['ylim'])
-                self.FigSG.set_ylim(self.options['ylimSG'])
-                self.FigSG.set_xlim(self.options['xlim'])
+        if(self.options['plotSetLims']):
+            self.FigFunc.set_xlim(self.options['xlim'])
+            self.FigFunc.set_ylim(self.options['ylim'])
+            self.FigSG.set_ylim(self.options['ylimSG'])
+            self.FigSG.set_xlim(self.options['xlim'])
 
-            if(self.options['rawIter']):
-                self.FigFunc.set_xlabel('Iteration count')
-                self.FigSG.set_xlabel('Iteration count')
-            else:
-                self.FigFunc.set_xlabel('Q equivalent multiplies')
-                self.FigSG.set_xlabel('Q equivalent multiplies')
+        if(self.options['rawIter']):
+            self.FigFunc.set_xlabel('Iteration count')
+            self.FigSG.set_xlabel('Iteration count')
+        else:
+            self.FigFunc.set_xlabel('Q equivalent multiplies')
+            self.FigSG.set_xlabel('Q equivalent multiplies')
 
-            self.FigFunc.set_ylabel('relative error function values')
-            self.FigSG.set_ylabel('minimum norm of subgradient')
+        self.FigFunc.set_ylabel('relative error function values')
+        self.FigSG.set_ylabel('minimum norm of subgradient')
 
-            if (self.options['rawFuncPlt'] == False):
-                self.FigFunc.set_yscale('log')
+        if (self.options['rawFuncPlt'] == False):
+            self.FigFunc.set_yscale('log')
 
-            plt.show()
-
+        plt.show()
 
 
-def fval_eNet(theta,A,b,lam1,lam2):
-    return (0.5*np.linalg.norm(A.dot(theta)-b)**2+lam1*np.linalg.norm(theta,1)+0.5*lam2*np.linalg.norm(theta,2)**2)
+
+def fval(theta,A,b,lam):
+    #Evaluate the lasso function
+    return (0.5*np.linalg.norm(A.dot(theta)-b)**2+lam*np.linalg.norm(theta,1) )
 
 
-def ADMMRelErr_eNet(A,b,lam1,lam2,maxIter,c,maxInner,sigma,doSubg,doP,doTheta,doFuncs):
+def ADMMRelErr_eNet(A,b,lam1,maxIter,c,maxInner,sigma,doSubg,doP,doTheta,doFuncs):
     [_,d] = A.shape
     p = np.zeros(d)
     theta = np.zeros(d)
     nu = np.zeros(d)
     Atb = A.T.dot(b)
-    fp = [fval_eNet(p, A, b, lam1, lam2)]
-    ftheta = [fval_eNet(theta, A, b, lam1, lam2)]
+    fp = [fval(p, A, b, lam1)]
+    ftheta = [fval(theta, A, b, lam1)]
     p_subg = [LSmod.maxSubg(A,b,lam1,p)]
     theta_subg = [LSmod.maxSubg(A,b,lam1,theta)]
     ts_termC = 0
@@ -367,13 +407,13 @@ def ADMMRelErr_eNet(A,b,lam1,lam2,maxIter,c,maxInner,sigma,doSubg,doP,doTheta,do
         nmults = 0
         bright = Atb + c*theta - nu
         Ap = A.dot(p)
-        Aleftp = A.T.dot(Ap) + (lam2+c)*p
+        Aleftp = A.T.dot(Ap) + c*p
         r = bright -Aleftp
         nmults += 2
         q = r
         pl = p
         for l in range(maxInner):
-            [pl,r,q] = pUpdateADMM(A,r,q,pl,lam2,c)
+            [pl,r,q] = pUpdateADMM(A,r,q,pl,c)
             nmults += 2
             nul = nu + c*(pl - theta) + r
             thetal = thetaUpdateADMM(lam1,c,pl,nul)
@@ -391,17 +431,17 @@ def ADMMRelErr_eNet(A,b,lam1,lam2,maxIter,c,maxInner,sigma,doSubg,doP,doTheta,do
                 theta_subg.append(LSmod.maxSubg(A,b,lam1,theta))
         if(doFuncs):
             if(doP):
-                fp.append(fval_eNet(p, A, b, lam1, lam2))
+                fp.append(fval(p, A, b, lam1))
             if(doTheta):
-                ftheta.append(fval_eNet(theta, A, b, lam1, lam2))
+                ftheta.append(fval(theta, A, b, lam1))
         t_termC = time.time() - t_termC
         ts_termC += t_termC
     return [ftheta,fp,theta,p,MatMults,theta_subg,p_subg,ts_termC]
 
 
-def pUpdateADMM(A,r,q,p,lam2,c):
+def pUpdateADMM(A,r,q,p,c):
     Aq = A.dot(q)
-    Aleftq = A.T.dot(Aq) + (lam2 + c) * q
+    Aleftq = A.T.dot(Aq) + c * q
 
     alpha =r.T.dot(r)/(q.T.dot(Aleftq))
     p = p + alpha*q
@@ -418,7 +458,7 @@ def thetaUpdateADMM(lam1,c,p,nu):
 
 
 def createPartitions(n_rows,n_partitions,partition_choice):
-    # partitions stuff
+
     partition_size = float(n_rows) / float(n_partitions)
     partition_size2use = int(partition_size)
 
@@ -450,3 +490,6 @@ def cvxSolL1LS(n_cols,b,A,lam):
     NNZ = sum([abs(xopt[i])>1e-6 for i in range(xopt.shape[0])])
     print('Number nonzero in solution is ' + str(float(NNZ)) + ' out of '+ str(n_cols) )
     return [opt,xopt]
+
+
+

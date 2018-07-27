@@ -1,10 +1,17 @@
-import numpy as np	
+# Copyright 2018, Patrick R. Johnstone
+#    This toolbox is distributed in the hope that it will be useful, but
+#    WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+#    General Public License <http://www.gnu.org/licenses/> for more
+#    details.
+
+import numpy as np
 import L1LS as LSmod
 import algoFuncs as af
 import proxes as px
 import time
 
-from matplotlib import pyplot as plt
+
 
 class PSLasso:
     def __init__(self):
@@ -28,8 +35,7 @@ class PSLasso:
         'opPerIter':1, # how many slices to update per iteration
         'randomOpAdd': False, # whether to add a random number of slices per iteration
         'D':0,       # max amount of delay
-        'reducedW':True, # our hyplerplane formulation. If alse use Eckstein (2017) formulation
-        'useOptStep':False, # whether to use the 'optimized' stepsize for affine operators
+        'reducedW':True, # our hyplerplane formulation. If False use Eckstein (2017) formulation
         'doAutoBT':False, # whether to use the automatic backtracking stepsize for affine operators
 		'equalizeRho':True, # when doing forward steps with backtracking, set the stepsize to be the average of the 
 		                    # least squares stepsizes
@@ -39,15 +45,16 @@ class PSLasso:
         'funcVals':True, #get plots of function values
         'subgVals':False, #get plots of subgradient values
         'L1every':True, #do the prox for the L1 every iteration
-        'L1freq':1 #If L1every is false, then do a L1 backward step every 'L1freq' iterations
+        'L1freq':0 #If L1every is false, then do a L1 backward step every 'L1freq' iterations. If this is set to 0
+        # add the l1 term to the greedy search
         }
 
-    def getData(self,Amtx,bvec,lambdaval,part_list_in,optVal=-1):
+    def getData(self,Amtx,bvec,lambdaval,part_list_in):
         self.A = Amtx
         self.b = bvec
         self.lam = lambdaval
         self.partition_list = part_list_in
-        self.opt = optVal
+
 
     def updateOptions(self,newOps):
         self.options.update(newOps)
@@ -79,8 +86,14 @@ class PSLasso:
 
         if(self.options['L1every']):
             n2use = 1
+        elif(self.options['L1freq']>0):
+            n2use = 1
         else:
             n2use = 0
+        #n2use is set to 0 if the ell_1 term is to be treated the same as the least-squares terms in that it will
+        #be included in the greedy search.
+        #otherwise, n2use is 1 if the ell_1 term is to be processed once every iteration or periodically, for
+        # example once every 10 iterations
 
         # the three "outputs" are a sequence of function values, subgradient values, and the number of cumulative
         # Q-equivalent multiplies required to achieve those function values and subgradients (evaulated at x[findex])
@@ -121,13 +134,18 @@ class PSLasso:
 
             if(self.options['L1every']):
                 # we always update the ell-term
-                if(k%self.options['L1freq']==0):
-                    Ik = np.ones(1,'int')
-                else:
-                    Ik = np.zeros(1, 'int')
-                Ik = np.concatenate((Ik,Iks))
-            else:
+                Ik = np.ones(1, 'int')
+                Ik = np.concatenate((Ik, Iks))
+
+            elif(k%self.options['L1freq']==0):
+                Ik = np.ones(1, 'int')
+                Ik = np.concatenate((Ik, Iks))
+            elif(n2use==0):
                 Ik = Iks
+            else:
+                Ik = np.zeros(1, 'int')
+                Ik = np.concatenate((Ik, Iks))
+
 
             for i in range(m + 1):
 
@@ -162,17 +180,11 @@ class PSLasso:
                                 # no backtracking linesearch
                                 Tiz = LSmod.gradLinear(z2use, self.Q[i-1], self.b[self.partition_list[i - 1]])
 
-                                if(self.options['useOptStep']==True):
-                                    # use the optimal stepsize for affine functions as in Section 4.3.
-                                    [rho[i],denomRight] = self.getOptStepFor(Tiz,wi2use,self.Q[i-1], self.Atbis[i-1])
-                                    self.x[i] = z2use - rho[i] * (Tiz - wi2use)
-                                    self.y[i] = Tiz - rho[i]*denomRight
 
-                                else:
-                                    # simple fixed stepsize
-                                    self.x[i] = z2use - rho[i] * (Tiz - wi2use)
+                                # simple fixed stepsize
+                                self.x[i] = z2use - rho[i] * (Tiz - wi2use)
 
-                                    self.y[i] = LSmod.gradLinear(self.x[i], self.Q[i-1], self.b[self.partition_list[i - 1]])
+                                self.y[i] = LSmod.gradLinear(self.x[i], self.Q[i-1], self.b[self.partition_list[i - 1]])
 
                                 # there have been four multiplies by matrix Q_i
                                 mults2add += 4*len(self.partition_list[i-1])/float(n_rows)
@@ -352,7 +364,7 @@ class PSLasso:
         pis = []
         alphas = []
         S = 0
-        self.getTerminationVal(self.x[self.options['funcIndex']],self.x[self.options['funcIndex']])
+        self.getTerminationVal(self.x[self.options['funcIndex']])
         self.mults.append(0)
         self.iters.append(0)
 

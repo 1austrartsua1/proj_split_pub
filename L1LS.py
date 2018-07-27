@@ -1,3 +1,10 @@
+# Copyright 2018, Patrick R. Johnstone
+#    This toolbox is distributed in the hope that it will be useful, but
+#    WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+#    General Public License <http://www.gnu.org/licenses/> for more
+#    details.
+
 
 import numpy as np
 import proxes as px
@@ -164,24 +171,6 @@ def proxGradL1LS(A,b,lam,x0,tau,maxIter,backtrackType,subgVal):
 
     return [x,f_pg,numMults,pg_subg,tsubgvals]
 
-def proxQuad_slow(a,rho,Q,v):
-    QtQ = Q.T.dot(Q)
-    dim = QtQ.shape[0]
-    x = np.linalg.solve(np.eye(dim)+rho*QtQ,a+rho*Q.T.dot(v))
-    y = (QtQ.dot(x) - Q.dot(v))
-    return [x,y]
-
-def proxQuad_fixedInner(a,rho,Q,v,maxInner,L):
-    # Regular gradient descent applied to the prox subproblem for the least-squares
-	# slice. I don't recommend using this when you can use conjugate gradients. 
-    tau = 1/(1+rho*L)
-    xhat = a
-    for n in range(maxInner):
-        xhat = xhat - tau*(xhat - a + rho*Q.T.dot(Q.dot(xhat) - v))
-
-    y = Q.T.dot(Q).dot(xhat) - Q.T.dot(v)
-    return [xhat,y]
-	
 def proxQuad_cg(a,rho,Q,Qtv,maxInner,errCheck,sigma,z,w,x0):
     # computes the prox of the least-squares term wrt to Q and  v
 	# via conjugate gradients. While checking the relative error criterion
@@ -213,6 +202,7 @@ def proxQuad_cg(a,rho,Q,Qtv,maxInner,errCheck,sigma,z,w,x0):
                     #error check satisfied
                     y = QtQx - Qtv
                     return [x,y,4*(i+2)]
+
     return [x,y,4*(MaxInner+1)]
 
 def Acg(x,Q,rho):

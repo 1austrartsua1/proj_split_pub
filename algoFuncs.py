@@ -1,3 +1,10 @@
+# Copyright 2018, Patrick R. Johnstone
+#    This toolbox is distributed in the hope that it will be useful, but
+#    WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+#    General Public License <http://www.gnu.org/licenses/> for more
+#    details.
+
 import numpy as np
 
 def greedySearch(z,w,x,y,n):
