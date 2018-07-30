@@ -42,7 +42,8 @@ anExp.runTheExp()
 anExp = LE.LassoFullExp()
 anExp.getMatvec(A,b)
 anExp.updateWhich2run({'doBack':True,'doFISTA':True,'doPG':True,'doADMM':True})
-anExp.updateOptions({'lambda':5.0}) # this is how you set the value of lambda
+anExp.updateOptions({'lambda':5.0,'verbose':False}) # this is how you set the value of lambda. Also, setting verbose
+#to false supresses some of the print statements
 anExp.runTheExp()
 
 ########################### EXPERIMENT 3 ###############################################################################

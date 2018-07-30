@@ -45,8 +45,9 @@ class PSLasso:
         'funcVals':True, #get plots of function values
         'subgVals':False, #get plots of subgradient values
         'L1every':True, #do the prox for the L1 every iteration
-        'L1freq':0 #If L1every is false, then do a L1 backward step every 'L1freq' iterations. If this is set to 0
+        'L1freq':0, #If L1every is false, then do a L1 backward step every 'L1freq' iterations. If this is set to 0
         # add the l1 term to the greedy search
+        'verbose':True #if true, print out iteration counter
         }
 
     def getData(self,Amtx,bvec,lambdaval,part_list_in):
@@ -249,7 +250,9 @@ class PSLasso:
             if (k % m/self.options['opPerIter'] == 0):
                 #only calculate the function values every m iterations as this can take some time and really slow down
                 # the algorithm on large problems
-                print"PS"+string+" iteration: "+str(k)
+                if(self.options['verbose']):
+                    print"PS"+string+" iteration: "+str(k)
+
                 if(self.options['funcIndex']>=0):
                     x2use = self.x[self.options['funcIndex']]
                 else:
@@ -262,8 +265,9 @@ class PSLasso:
                 self.mults.append(self.multsAll[k + 1])
                 self.iters.append(k+1)
 
+        if(self.options['verbose']):
+            print"time to calculate functions:"+str(fcaltimeT)
 
-        print"time to calculate functions:"+str(fcaltimeT)
         self.runtime = time.time() - t - fcaltimeT   #running time is adjusted by subtracting time taken to compute function values
         self.sparsity = sum(abs(self.x[self.options['funcIndex']])>1e-5)
 

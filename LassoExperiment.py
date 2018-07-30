@@ -95,7 +95,8 @@ class LassoFullExp:
         'rawIter':False, #If true use actual iterations for the x-axis of the plot. Otherwise use Q-equivalent multiplies
         'rawFuncPlt':False, # If False, plot the function values on a logarithmic scale
         'subgVals':True, # If true, plot the subgradient values
-        'plotSetLims':False # If true, set limits on the x-axis and y-axis for the plots
+        'plotSetLims':False, # If true, set limits on the x-axis and y-axis for the plots
+        'verbose':True # If true print out iteration counter
         }
         self.pSFparams = MethodParams('PSF')
         self.pSBparams = MethodParams('PSB')
@@ -158,8 +159,8 @@ class LassoFullExp:
             [_,n_cols]=self.A.shape
             [_, f_pg, mults_pg,pg_subg,t_subg] = LSmod.proxGradL1LS(self.A,self.b, self.options['lam'], np.zeros(n_cols), 1.0,
                                                      self.pGparams.params['maxIter'], 'backTrack',
-                                                     self.options['subgVals'])
-            print"time to compute subgs "+str(t_subg)
+                                                     self.options['subgVals'],self.options['verbose'])
+
             tpg = time.time() - tpg
             outObj = OutObj(f_pg, mults_pg, tpg-t_subg,pg_subg)
             print 'prox grad running time ' + str(tpg-t_subg)
@@ -171,8 +172,7 @@ class LassoFullExp:
                                self.aDMMparams.params['maxIter'], self.aDMMparams.params['c'],
                                self.aDMMparams.params['maxInner'],self.aDMMparams.params['sigma'],
                                self.options['subgVals'],self.aDMMparams.params['doP'],
-                               self.aDMMparams.params['doTheta'],self.options['funcVals'])
-            print"time to compute subg/funcs "+str(tadmmTermC)
+                               self.aDMMparams.params['doTheta'],self.options['funcVals'],self.options['verbose'])
             tadmm = time.time() - tadmm
             print 'ADMM running time ' + str(tadmm-tadmmTermC)
             print"ADMM sparsity "+str(sum(abs(theta)>1e-5))
@@ -207,6 +207,7 @@ class LassoFullExp:
             self.normalizeCols()
 
         self.runSingleExp()
+        print"========================="
         self.metaPlot()
 
 
@@ -216,6 +217,7 @@ class LassoFullExp:
         [_,n_cols] = self.A.shape
 
         if(self.which2run['doCVX']):
+            print"========================="
             print('Running CVX opt...')
             tcvx = time.time()
             [self.cvxopt,_] = cvxSolL1LS(n_cols,self.b,self.A,self.options['lam'])
@@ -224,18 +226,23 @@ class LassoFullExp:
 
 
         if(self.which2run['doFor']):
+            print"========================="
             self.PSFor = self.runWoptions('PSF')
 
         if(self.which2run['doBack']):
+            print"========================="
             self.PSBack = self.runWoptions('PSB')
 
         if(self.which2run['doFISTA']):
+            print"========================="
             self.outFista = self.runWoptions('fista')
 
         if(self.which2run['doPG']):
+            print"========================="
             self.outPG = self.runWoptions('PG')
 
         if(self.which2run['doADMM'] ==True):
+            print"========================="
             self.outADMMrelThta = self.runWoptions('ADMM')
 
 
@@ -280,7 +287,8 @@ class LassoFullExp:
         tfista = time.time()
         [f_fista, x, iterFista,subgsFista,tsubgs] = LSmod.FISTAL1LS(self.A, self.b, self.options['lam'], x0, tau,
                                                   self.fistaparams.params['maxIter'],False, -1,
-                                                  self.fistaparams.params['doBT'],0,self.options['subgVals'])
+                                                  self.fistaparams.params['doBT'],self.options['subgVals'],
+                                                    self.options['verbose'])
         tfista = time.time() - tfista - tsubgs
         print 'fista running time ' + str(tfista)
         sparsityFista = sum(abs(x)>1e-5)
@@ -390,7 +398,7 @@ def fval(theta,A,b,lam):
     return (0.5*np.linalg.norm(A.dot(theta)-b)**2+lam*np.linalg.norm(theta,1) )
 
 
-def ADMMRelErr_eNet(A,b,lam1,maxIter,c,maxInner,sigma,doSubg,doP,doTheta,doFuncs):
+def ADMMRelErr_eNet(A,b,lam1,maxIter,c,maxInner,sigma,doSubg,doP,doTheta,doFuncs,verbose):
     [_,d] = A.shape
     p = np.zeros(d)
     theta = np.zeros(d)
@@ -403,7 +411,8 @@ def ADMMRelErr_eNet(A,b,lam1,maxIter,c,maxInner,sigma,doSubg,doP,doTheta,doFuncs
     ts_termC = 0
     MatMults = [0]
     for k in range(maxIter):
-        print"ADMM Iteration: "+str(k)
+        if(verbose):
+            print"ADMM Iteration: "+str(k)
         nmults = 0
         bright = Atb + c*theta - nu
         Ap = A.dot(p)

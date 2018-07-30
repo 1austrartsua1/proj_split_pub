@@ -48,12 +48,9 @@ def gradLinear(z,Q,v):
 def L1LSvalue(A,b,z,lam):
     return 0.5*np.linalg.norm(A.dot(z)-b)**2+lam*np.linalg.norm(z,1)
 
-def FISTAL1LS(A,b,lam,x0,tau,maxIter,elasNet = False,lam2 = -1,backTrack = False,q=0.0,doSubgs=False):
+def FISTAL1LS(A,b,lam,x0,tau,maxIter,elasNet = False,lam2 = -1,backTrack = False,doSubgs=False,verbose=True):
     t = 1.0
-    theta = 1.0
-    beta = 0.0
     x = x0
-    xold = x0
     y = x0
     f = [L1LSvalue(A, b, x, lam)]
     subgs = [maxSubg(A, b, lam, x)]
@@ -61,7 +58,8 @@ def FISTAL1LS(A,b,lam,x0,tau,maxIter,elasNet = False,lam2 = -1,backTrack = False
     tsubgs = 0
     for k in range(maxIter):
         if(k%10==0):
-            print"Fista iteration: " + str(k)
+            if(verbose):
+                print"Fista iteration: " + str(k)
 
         grady = gradLinear(y, A, b)
 
@@ -89,39 +87,22 @@ def FISTAL1LS(A,b,lam,x0,tau,maxIter,elasNet = False,lam2 = -1,backTrack = False
         if(doSubgs):
             tnewSubg = time.time()
             subgs.append(maxSubg(A, b, lam, xnew))
-            if(k>500):
-                if(subgs[len(subgs)-1]>10*subgs[len(subgs)-2]):
-                    print"debugging needed"
-                    print"iteration: " + str(k)
-
             tnewSubg = time.time() - tnewSubg
             tsubgs += tnewSubg
 
         iterFista.append(iterFista[len(iterFista)-1]+2+i)
-        xoldold = xold
         xold = x
         x = xnew
-        if(q == 0):
-            tnew = 0.5 + 0.5 * np.sqrt(1 + 4 * t**2)
-            beta = (t - 1) / tnew
-            t = tnew
-        elif(q==-1.0):
-            #running prox grad
-            beta = 0.0
-        else:
-            thetanew = (q-theta**2 + np.sqrt((q-theta**2)**2 + 4*theta**2))/2
-            if(thetanew > 1.0):
-                thetanew = (q - theta ** 2 - np.sqrt((q - theta ** 2) ** 2 + 4 * theta ** 2)) / 2
 
-            beta = (theta*(1-theta))/(theta**2 + thetanew)
-            theta = thetanew
-
+        tnew = 0.5 + 0.5 * np.sqrt(1 + 4 * t**2)
+        beta = (t - 1) / tnew
+        t = tnew
         y = x + beta * (x - xold)
 
     return [f,x,iterFista,subgs,tsubgs]
 
 
-def proxGradL1LS(A,b,lam,x0,tau,maxIter,backtrackType,subgVal):
+def proxGradL1LS(A,b,lam,x0,tau,maxIter,backtrackType,subgVal,verbose):
     [m,d]=A.shape
     xold=x0
     f_pg = [L1LSvalue(A, b, xold, lam)]
@@ -133,7 +114,8 @@ def proxGradL1LS(A,b,lam,x0,tau,maxIter,backtrackType,subgVal):
     pg_subg =  [maxSubg(A,b,lam,xold)]
     tsubgvals = 0
     for k in range(maxIter):
-        print"PG iteration: "+str(k)
+        if(verbose):
+            print"PG iteration: "+str(k)
         gnew = float('inf')
         gradxOld = gradLinear(xold, A, b)
         innerIters = 0
