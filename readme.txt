@@ -50,7 +50,7 @@ Set lambda using
 anExp.updateOptions({'lambda':5.0})
 
 ----------------------------------------------------------------------------------------------------------------------
-By default, the code runs PSFor(10,G) (see Section 5 of [1]) and the cvxpy solver. To run, use
+By default, the code runs PSFor(10,G) (see Section 5 of [1]) and the cvxpy solver with lambda set to 1.0. To run, use
 
 anExp.runTheExp()
 
@@ -82,6 +82,46 @@ To update the parameters of a given method, use the "updateParams" member functi
 the stepsizes for PSBack:
 
 anExp.updateParams('PSB', {'rho_0':1e-1,'rho1plus':1e-1})
+
+----------------------------------------------------------------------------------------------------------------------
+In total there are 6 python files
+
+testRun.py:
+includes several test experiments. Run this before running anything else. 
+
+LassoExperiment.py: 
+includes the main class LassoFullExp that defines an instance of the experiment. It also includes a few subroutines
+
+runPS.py:
+includes the class PSLasso with allows you to run projective splitting on the lasso problem via PSLasso.runPS()
+
+L1LS.py:
+includes implementations of FISTA and proximal gradient and a few helpful functions for the L1-regularized least squares 
+(lasso) problem
+
+proxes.py:
+simply defines the prox operator for the L1 norm
+
+algoFuncs.py:
+includes several functions necessary for projective splitting
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
